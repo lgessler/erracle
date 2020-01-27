@@ -8,9 +8,9 @@
     ;; This aims to be complete for the specification as it existed in January 2020.
     ;; The result is this parser is a seq of 11-item vectors, the first being a keyword
     ;; indicating the line's type, and the remaining columns containing the CONLLU data.
+    ;; This parser tries to restrict input wherever there are explicit specifications,
+    ;; and otherwise takes input that is as broad as sensibly possible.
     ;; Cf. https://universaldependencies.org/format.html
-    ;; This parser does not enforce certain constraints, e.g. that feature names
-    ;; conform to the pattern #'[A-Z0-9][A-Z0-9a-z]*(\\[[a-z0-9]+\\])?'
     "
     <line> ::= comment-line
              | token-line
