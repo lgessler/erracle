@@ -74,10 +74,6 @@
     <dep-tail>  ::= ε | <'|'> dep dep-tail
     dep         ::= dep-head <':'> dep-rest
     <dep-head>  ::= token-ref
-    (* this is what is strictly correct according to the documentation, but unfortunately it looks like
-     * EWT is non-compliant (*
-    <dep-rest>  ::= #'[a-z]+(:[a-z]+)?(:[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]+(_[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]+)*)?(:[a-z]+)?'
-     *)
     <dep-rest>  ::= #'[a-z]+'
                     (<':'> #'[a-z]+')?
                     (<':'> #'[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]+(_[\\p{Ll}\\p{Lm}\\p{Lo}\\p{M}]+)*')?
