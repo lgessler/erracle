@@ -147,9 +147,6 @@
 (defrecord CommentLine [body])
 
 (defmulti recordify first)
-(defmethod recordify :default
-  [x]
-  (prn x))
 (defmethod recordify :token-line
   [[_ fields]]
   (map->TokenLine fields))
@@ -172,14 +169,61 @@
           postprocess-columns
           recordify))
 
+(defn- sentencify
+  "Turns a seq of lines into a seq of sentences (which are seqs of lines) by partitioning
+  by ascending :id."
+  [line-seq]
+  (let [last-id (atom nil)]
+    (partition-by
+      (fn [{:keys [id] :as x}]
+        ;; begin a new partition when current item has an id and either
+        ;;   (1) this ID is nil and the last one was not nil
+        ;;       (happens when a sentence begins with header comments
+        ;;   (2) this and the last id are non-nil and this id is lesser than the last one
+        ;;       (happens when
+        ;; was nil or (2) the last id was not nil and the current id is lesser than it
+        (let [retval (or (and (nil? id) (some? @last-id))
+                         (and (some? id) (some? @last-id) (< id @last-id)))]
+
+          ;; the cases above assume comments can't occur inside sentences, throw if this happens
+          (when (and (nil? @last-id) (some? id) (> id 1))
+            (throw (ex-info "There was a comment in the middle of a sentence!" x)))
+
+          (reset! last-id id)
+          retval))
+      line-seq)))
+
 (defn parse-file
+  "Parses a conllu file and returns a seq of sentences, where each sentence is a seq of lines.
+  Comments are discarded."
   [filepath]
   (when-not (.exists (io/as-file filepath))
     (throw (ex-info "File doesn't exist" {:filepath filepath})))
+
   (->> filepath
        slurp
        clojure.string/split-lines
-       (pmap parse-line)))
+       (pmap parse-line)
+       (remove nil?)
+       sentencify))
+
+(defn remove-comments
+  [sentences]
+  (->> (for [sentence sentences]
+         (remove #(instance? CommentLine %) sentence))
+       (remove nil?)))
+
+(defn remove-supertokens
+  [sentences]
+  (->> (for [sentence sentences]
+        (remove #(instance? SuperTokenLine %) sentence))
+      (remove nil?)))
+
+(defn remove-ellipsis-tokens
+  [sentences]
+  (->> (for [sentence sentences]
+         (remove #(instance? EllipsisLine %) sentence))
+       (remove nil?)))
 
 (defn parse-files
   [filepaths]
