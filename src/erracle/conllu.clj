@@ -149,16 +149,16 @@
 (defmulti recordify first)
 (defmethod recordify :token-line
   [[_ fields]]
-  (map->TokenLine fields))
+  (map->Token fields))
 (defmethod recordify :supertoken-line
   [[_ fields]]
-  (map->SuperTokenLine fields))
+  (map->SuperToken fields))
 (defmethod recordify :ellipsis-line
   [[_ fields]]
-  (map->EllipsisLine fields))
+  (map->EllipsisToken fields))
 (defmethod recordify :comment-line
   [[_ text]]
-  (->CommentLine text))
+  (->Comment text))
 
 ;; top level fns -----------------------------------------------------------------
 (defn- parse-line
@@ -210,19 +210,19 @@
 (defn remove-comments
   [sentences]
   (->> (for [sentence sentences]
-         (remove #(instance? CommentLine %) sentence))
+         (remove #(instance? Comment %) sentence))
        (remove nil?)))
 
 (defn remove-supertokens
   [sentences]
   (->> (for [sentence sentences]
-        (remove #(instance? SuperTokenLine %) sentence))
+        (remove #(instance? SuperToken %) sentence))
       (remove nil?)))
 
 (defn remove-ellipsis-tokens
   [sentences]
   (->> (for [sentence sentences]
-         (remove #(instance? EllipsisLine %) sentence))
+         (remove #(instance? Ellipsis %) sentence))
        (remove nil?)))
 
 (defn parse-files
