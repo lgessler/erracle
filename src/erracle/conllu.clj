@@ -1,4 +1,4 @@
-(ns erracle.conllu.parse
+(ns erracle.conllu
   (:require [clojure.java.io :as io]
             [instaparse.core :as insta]))
 
@@ -85,45 +85,92 @@
     misc-item   ::= #'\\w+' <'='> #'.+'
     "))
 
-;; light postprocessing:
-;; - turn FEATS into a dict
+
+;; light postprocessing ------------------------------------------------------------
+;; - turn FEATS, DEPS, MISC into a dict or nil
 ;; - made ID uniform
 ;; - turn HEAD and ID into numbers
-;; TODO: MISC and DEPS not postprocessed
 (defmulti postprocess-column first)
 (defmethod postprocess-column :default [x] x)
 
 (defmethod postprocess-column :id-token
   [[_ val]]
   [:id (clojure.edn/read-string val)])
+
 (defmethod postprocess-column :id-supertoken
   [[_ val]]
   [:id [(map clojure.edn/read-string (clojure.string/split val #"-"))]])
+
 (defmethod postprocess-column :id-ellipsis
   [[_ val]]
   [:id (clojure.edn/read-string val)])
+
 (defmethod postprocess-column :head
   [[tag val]]
-  [tag (clojure.edn/read-string val)])
+  (if (= val "_")
+    [tag nil]
+    [tag (clojure.edn/read-string val)]))
 
 (defmethod postprocess-column :feats
   [[tag & data]]
-  [tag (into {}
-             (for [[_ k v] data]
-               [(keyword k) v]))])
+  (if (and (= (count data) 1) (= (first data) "_"))
+    [tag nil]
+    [tag (into {} (for [[_ k v] data]
+                    [(keyword k) v]))]))
+
+(defmethod postprocess-column :misc
+  [[tag & data]]
+  (if (and (= (count data) 1) (= (first data) "_"))
+    [tag nil]
+    [tag (into {} (for [[_ k v] data]
+                    [(keyword k) v]))]))
+
+(defmethod postprocess-column :deps
+  [[tag & deps]]
+  (if (and (= (count deps) 1) (= (first deps) "_"))
+    [tag nil]
+    [tag (into {} (for [[_ head deprel] deps]
+                    [(clojure.edn/read-string head) deprel]))]))
 
 (defn- postprocess-columns
   [[tag & cols :as line]]
   (if (#{:token-line :supertoken-line :ellipsis-line} tag)
-    [tag (into {} (mapv postprocess-column cols))]
+    [tag (into {} (map postprocess-column cols))]
     line))
 
+
+;; records -------------------------------------------------------------------
+;; turn every line type into a record
+(defrecord TokenLine [id form lemma upos xpos feats head deprel deps misc])
+(defrecord SuperTokenLine [id form lemma upos xpos feats head deprel deps misc])
+(defrecord EllipsisLine [id form lemma upos xpos feats head deprel deps misc])
+(defrecord CommentLine [body])
+
+(defmulti recordify first)
+(defmethod recordify :default
+  [x]
+  (prn x))
+(defmethod recordify :token-line
+  [[_ fields]]
+  (map->TokenLine fields))
+(defmethod recordify :supertoken-line
+  [[_ fields]]
+  (map->SuperTokenLine fields))
+(defmethod recordify :ellipsis-line
+  [[_ fields]]
+  (map->EllipsisLine fields))
+(defmethod recordify :comment-line
+  [[_ text]]
+  (->CommentLine text))
+
+;; top level fns -----------------------------------------------------------------
 (defn- parse-line
   [line]
-  (-> line
-      conllu-line-parser
-      first
-      postprocess-columns))
+  (some-> line
+          conllu-line-parser
+          first
+          postprocess-columns
+          recordify))
 
 (defn parse-file
   [filepath]
